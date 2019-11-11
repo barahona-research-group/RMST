@@ -22,7 +22,6 @@ To use, simply
 from RMST import RMST
 
 G_RMST = RMST(G)
-
 ```
 for a networks graph `G`. 
 

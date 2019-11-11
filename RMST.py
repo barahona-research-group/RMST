@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.matlib as matlib
 import pylab as plt
 import networkx as nx
 
@@ -14,8 +15,9 @@ def RMST(G,gamma=0.5):
     Return: networkX RMST graph
     """
     
-    Y = np.asarray(nx.adjacency_matrix(G).todense())
+    Y = np.asarray(nx.to_numpy_matrix(G))
     E = constructNetworkStructure(Y,1./gamma)
+
     return nx.Graph(E)
 
 #Relaxed Minimum Spanning Tree
@@ -43,7 +45,7 @@ def constructNetworkStructure(D, *args):
     mD = np.amin(Dtemp,0)/p
     
     # Check condition
-    mDnew = np.matlib.repmat(mD, N, 1)+np.transpose(np.matlib.repmat(mD, N, 1))
+    mDnew = matlib.repmat(mD, N, 1)+np.transpose(matlib.repmat(mD, N, 1))
     E = np.less((D - mDnew), LLink).astype(int)
     E = E-np.diag(np.diag(E))
 

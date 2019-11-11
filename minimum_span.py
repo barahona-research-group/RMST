@@ -6,6 +6,7 @@ Created on Tue Dec  5 17:42:36 2017
 @author: robert
 """
 import numpy as np
+import numpy.matlib as matlib 
 
 # A vector (T) with the shortest distance to all nodes.
 # After an addition of a node to the network, the vector is updated
@@ -94,7 +95,7 @@ def constructNetworkStructure(D, *args):
     mD = np.amin(Dtemp,0)/p
     
     # Check condition
-    mDnew = np.matlib.repmat(mD, N, 1)+np.transpose(np.matlib.repmat(mD, N, 1))
+    mDnew = matlib.repmat(mD, N, 1)+np.transpose(matlib.repmat(mD, N, 1))
     E = np.less((D - mDnew), LLink).astype(int)
     E = E-np.diag(np.diag(E))
 

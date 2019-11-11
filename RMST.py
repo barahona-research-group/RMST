@@ -1,10 +1,10 @@
 import numpy as np
-import numpy.matlib as matlib
-import pylab as plt
 import networkx as nx
+from multiprocessing import Pool
+import scipy.sparse as sparse
+from functools import partial
 
-
-def RMST(G,gamma=0.5):
+def RMST(G, gamma=0.5, n_cpu = 1):
     """
     Networkx wrapper for the RMST code
     Input:
@@ -14,99 +14,62 @@ def RMST(G,gamma=0.5):
     
     Return: networkX RMST graph
     """
-    
-    Y = np.asarray(nx.to_numpy_matrix(G))
-    E = constructNetworkStructure(Y,1./gamma)
 
-    return nx.Graph(E)
+    #get adjacency matrix 
+    A = nx.to_numpy_matrix(G)
 
-#Relaxed Minimum Spanning Tree
-#Build a minimum spanning tree from the data
-#It is optimal in the sense that the longest link in a path between
-# two nodes is the shortest possible
-#If a discounted version of the direct distance is shorter than
-#longest link in the path - connect the two nodes
-#The discounting is based on the local neighborhood around the two nodes
-#We can use for example half the distance to the nearest neighbors is used.
+    #adjacency matrix with large values instead of 0
+    A_no_zero = A.copy()
+    A_no_zero[A_no_zero == 0] = np.max(A) + 10
     
-# Reproduced in python by Robert Peach 05/12/17. Original code in matlab by Mariano Beguerisse 05/11/12
-           
-def constructNetworkStructure(D, *args):
-    
-    N = np.shape(D)[0]
-    D = np.ones((N,N)) - D # This is because D is a similarity matrix (not a dissimilarity matrix)
-    Emst, LLink = prim2(D) 
-    
-    p = 2.0 # smaller p would make it sparser
-    if len(args) > 0:
-        p = args[0]
-    # Find distance to nearest neighbours
-    Dtemp = D + np.eye(N)*np.amax(D)
-    mD = np.amin(Dtemp,0)/p
-    
-    # Check condition
-    mDnew = matlib.repmat(mD, N, 1)+np.transpose(matlib.repmat(mD, N, 1))
-    E = np.less((D - mDnew), LLink).astype(int)
-    E = E-np.diag(np.diag(E))
+    #minimum weight vector d_i = min_k z_{i,k}
+    d = np.asarray(A_no_zero.min(0))[0]
 
-    E = np.sign(E)
-    E = np.sign(Emst + E)
+    #local distribution \gamma(d_i+d_j)
+    D =  np.tile(d,(len(d),1))
+    local_distribution = gamma*(D + D.T)
     
-    return E
+    #minimum spannin tree from G
+    G_MST = nx.minimum_spanning_tree(G)
+    
+    #all shortest paths
+    all_shortest_paths = dict(nx.all_pairs_shortest_path(G_MST))
 
-def prim2(D):
-    LLink = np.zeros(np.shape(D))
-    #Number of nodes in the network
-    N = np.shape(D)[0]
-    #Allocate a matrix for the edge list
-    E = np.zeros(np.shape(D))
-    allidx = np.arange(0,N,1)
-    #Start with a node
-    mstidx = np.full(1, 0)
-    otheridx = list(set(allidx) - set(mstidx))
-    T = D[0,otheridx]
-    P = np.zeros((len(T)))
-    while T.size > 0:
-        #print(T.size)
-        i = np.argmin(T)
-        idx = otheridx[i]
-        
-        #Start with a node
-        E[idx,int(P[i])] = 1
-        E[int(P[i]),idx] = 1
-        
-        # 1) Update the longest links
-        #indexes of the nodes without the parent
-        idxremove = np.where(int(P[i])==mstidx)
-        tempmstidx = mstidx
-        tempmstidx = np.delete(tempmstidx,idxremove)
-        
-        # 2) update the link to the parent
-        LLink[idx,int(P[i])] = D[idx,int(P[i])]
-        LLink[int(P[i]),idx] = D[int(P[i]),idx]
+    #construct the mlink matrix 
+    G_mlink = nx.complete_graph(len(G))
+    mlink = np.zeros([len(G), len(G)])
 
-        # 3) find the maximal
-        tempLLink = np.maximum(LLink[int(P[i]),tempmstidx],D[idx,int(P[i])])
-        LLink[idx, tempmstidx] = tempLLink
-        LLink[tempmstidx, idx] = tempLLink
-        
-        # As a node is added clear his entries
-        P = np.delete(P,i)
-        T = np.delete(T,i)
+    if n_cpu == 1:  #if only one cpu, just do a loop
+        for i,j in G_mlink.edges():
+            path = all_shortest_paths[i][j]
+            for k in range(len(path)-1):
+                 mlink[i,j] = np.max([mlink[i,j], A[path[k],path[k+1]]])
 
-        # Add the node to the list
-        mstidx = np.append(mstidx,idx)
+    else: #else use multiprocessing 
+
+        mlink_f = partial(mlink_func, all_shortest_paths, A)
+
+        with Pool(processes = n_cpu) as p_rmst:  #initialise the parallel computation
+            mlink_edges = p_rmst.map(mlink_f, G_mlink.edges()) 
         
-        # Remove the node from the list of the free nodes
-        otheridx = np.delete(otheridx,i)
-        
-        #update the distance matrix
-        Ttemp = D[idx,otheridx]
-        
-        if len(T) > 0:
-            idxless = np.where(Ttemp < T)
-            T[idxless] = Ttemp[idxless]
-            P[idxless] = idx;
-            
-    return E, LLink
+        #convert the output to a matrix
+        mlink_edges_dict = dict(zip(G_mlink.edges(), mlink_edges)) 
+        nx.set_edge_attributes(G_mlink, mlink_edges_dict, 'weight')
+        mlink = nx.to_numpy_matrix(G_mlink)
+
+    #construct the adjacency matrix of RMST graph
+    A_RMST = mlink + local_distribution - A
+    A_RMST[A_RMST > 0] = 1. #set positive values to 1
+    A_RMST[A_RMST < 0] = 0. #and remove negative values
+    
+    #return a networkx Graph
+    return nx.Graph(A_RMST)
+
+def mlink_func(all_shortest_paths, A, e):
+    mlink = 0 
+    path = all_shortest_paths[e[0]][e[1]]
+    for k in range(len(path)-1):
+        mlink = np.max([mlink, A[path[k],path[k+1]]])
+    return mlink
+
 

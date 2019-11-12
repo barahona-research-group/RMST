@@ -22,7 +22,7 @@ plt.savefig('original_graph.png')
 G_MST = nx.minimum_spanning_tree(G)
 
 plt.figure()
-nx.draw(G_MST, pos=pos,width = 2, node_size=50)
+nx.draw(G_MST, pos=pos, node_size=50, width = 0.5*np.array([G_MST[i][j]['weight'] for i,j in G_MST.edges]))
 plt.title('MST')
 plt.savefig('MST_graph.png')
 
@@ -30,7 +30,8 @@ plt.savefig('MST_graph.png')
 G_RMST = RMST(G, gamma = 0.5)
 
 plt.figure()
-nx.draw(G_RMST, pos=pos,width = 2, node_size=50)
+nx.draw(G_RMST, pos=pos, node_size=50, width = 0.5*np.array([G_RMST[i][j]['weight'] for i,j in G_RMST.edges]))
+plt.title('original graph')
 plt.title('RMST')
 plt.savefig('RMST_graph.png')
 

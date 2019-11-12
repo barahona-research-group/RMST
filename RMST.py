@@ -4,13 +4,15 @@ from multiprocessing import Pool
 import scipy.sparse as sparse
 from functools import partial
 
-def RMST(G, gamma=0.5, n_cpu = 1):
+def RMST(G, gamma=0.5, weighted = True, n_cpu = 1):
     """
     Networkx wrapper for the RMST code
     Input:
     
     G : networkx graph of similarity
     gamma: RMST parameter
+    weighted : return a graph with the original weights
+    n_cpu : number of cpu to use in the construction of mlink matrix 
     
     Return: networkX RMST graph
     """
@@ -29,43 +31,48 @@ def RMST(G, gamma=0.5, n_cpu = 1):
     D =  np.tile(d,(len(d),1))
     local_distribution = gamma*(D + D.T)
     
-    #minimum spannin tree from G
-    G_MST = nx.minimum_spanning_tree(G)
-    
-    #all shortest paths
-    all_shortest_paths = dict(nx.all_pairs_shortest_path(G_MST))
-
-    #construct the mlink matrix 
-    G_mlink = nx.complete_graph(len(G))
-    mlink = np.zeros([len(G), len(G)])
-
-    if n_cpu == 1:  #if only one cpu, just do a loop
-        for i,j in G_mlink.edges():
-            path = all_shortest_paths[i][j]
-            for k in range(len(path)-1):
-                 mlink[i,j] = np.max([mlink[i,j], A[path[k],path[k+1]]])
-
-    else: #else use multiprocessing 
-
-        mlink_f = partial(mlink_func, all_shortest_paths, A)
-
-        with Pool(processes = n_cpu) as p_rmst:  #initialise the parallel computation
-            mlink_edges = p_rmst.map(mlink_f, G_mlink.edges()) 
-        
-        #convert the output to a matrix
-        mlink_edges_dict = dict(zip(G_mlink.edges(), mlink_edges)) 
-        nx.set_edge_attributes(G_mlink, mlink_edges_dict, 'weight')
-        mlink = nx.to_numpy_matrix(G_mlink)
+    #compute the mlink matrix 
+    mlink = compute_mlink(G, n_cpu)
 
     #construct the adjacency matrix of RMST graph
     A_RMST = mlink + local_distribution - A
     A_RMST[A_RMST > 0] = 1. #set positive values to 1
     A_RMST[A_RMST < 0] = 0. #and remove negative values
-    
+
+    if weighted:
+        A_RMST = np.multiply(A, A_RMST)    
+
     #return a networkx Graph
     return nx.Graph(A_RMST)
 
+def compute_mlink(G, n_cpu):
+    """construct the mlink matrix"""
+
+    #minimum spannin tree from G
+    G_MST = nx.minimum_spanning_tree(G)
+
+    #all shortest paths
+    all_shortest_paths = dict(nx.all_pairs_shortest_path(G_MST))
+
+    G_mlink = nx.complete_graph(len(G))
+    mlink = np.zeros([len(G), len(G)])
+
+
+    mlink_f = partial(mlink_func, all_shortest_paths, A)
+
+    with Pool(processes = n_cpu) as p_rmst:  #initialise the parallel computation
+        mlink_edges = p_rmst.map(mlink_f, G_mlink.edges()) 
+
+    #convert the output to a matrix
+    mlink_edges_dict = dict(zip(G_mlink.edges(), mlink_edges)) 
+    nx.set_edge_attributes(G_mlink, mlink_edges_dict, 'weight')
+    mlink = nx.to_numpy_matrix(G_mlink)
+
+    return mlink 
+
 def mlink_func(all_shortest_paths, A, e):
+    """ compute one entr yof mlink matrix, for parallel computation """
+
     mlink = 0 
     path = all_shortest_paths[e[0]][e[1]]
     for k in range(len(path)-1):

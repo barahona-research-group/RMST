@@ -78,7 +78,7 @@ def compute_mlink(G, n_cpu):
     mlink = np.zeros([len(G), len(G)])
 
 
-    mlink_f = partial(mlink_func, all_shortest_paths, A)
+    mlink_f = partial(mlink_func, all_shortest_paths, G)
 
     with Pool(processes = n_cpu) as p_rmst:  #initialise the parallel computation
         mlink_edges = p_rmst.map(mlink_f, G_mlink.edges()) 
@@ -90,13 +90,13 @@ def compute_mlink(G, n_cpu):
 
     return mlink 
 
-def mlink_func(all_shortest_paths, A, e):
+def mlink_func(all_shortest_paths, G, e):
     """ compute one entr yof mlink matrix, for parallel computation """
 
     mlink = 0 
     path = all_shortest_paths[e[0]][e[1]]
     for k in range(len(path)-1):
-        mlink = np.max([mlink, A[path[k],path[k+1]]])
+        mlink = np.max([mlink, G[path[k]][path[k+1]]['weight']])
     return mlink
 
 

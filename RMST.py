@@ -77,8 +77,7 @@ def compute_mlink(G, n_cpu):
     G_mlink = nx.complete_graph(len(G))
     mlink = np.zeros([len(G), len(G)])
 
-
-    mlink_f = partial(mlink_func, all_shortest_paths, G)
+    mlink_f = partial(mlink_func, all_shortest_paths, G_MST)
 
     with Pool(processes = n_cpu) as p_rmst:  #initialise the parallel computation
         mlink_edges = p_rmst.map(mlink_f, G_mlink.edges()) 

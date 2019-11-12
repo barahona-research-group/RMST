@@ -9,24 +9,20 @@ Beguerisse-Díaz, Mariano, Borislav Vangelov, and Mauricio Barahona. "Finding ro
 Installation
 ------------
 
-To install 
+To install, have a working python3 environment, and run
 ```
 pip install .
 ```
+This will also install all the necessary dependencies (see setup.py). 
 
 Utilisation
 -----------
 
-To use, simply
+To use, simply do
 ```
 from RMST import RMST
 
-<<<<<<< HEAD
 G_RMST = RMST(G, gamma = 0.5, weighted = True, n_cpu = 1)
-
-=======
-G_RMST = RMST(G)
->>>>>>> 09ed63117bb2c08a2c26f0b9f517607c0b9882eb
 ```
 for a networks graph `G` and a given `gamma` parameter (set to `0.5` by default). 
 The other two parameters are for outputing the weighted or unweighted graph (with the original weights from Hadamard multiplication), and use more cpus to compute the `mlink` matrix. 

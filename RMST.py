@@ -62,11 +62,11 @@ def RMST(G, gamma=0.5, weighted = True, n_cpu = 1):
     local_distribution = gamma*(D + D.T)
     
     #compute the mlink matrix 
-    mlink = compute_mlink(G, n_cpu)
+    mlink = compute_mlink(nx.Graph(A), n_cpu)
 
     #construct the adjacency matrix of RMST graph
     A_RMST = mlink + local_distribution - A
-    A_RMST[A_RMST > 0] = 1. #set positive values to 1
+    A_RMST[A_RMST >= 0] = 1. #set positive values to 1
     A_RMST[A_RMST < 0] = 0. #and remove negative values
 
     if weighted:

@@ -8,16 +8,16 @@ from RMST import RMST
 np.random.seed(0)
 
 #create a graph from a random matrix
-N = 100
+N = 200
 A = np.random.uniform(.0,1.0,[N, N])
 A = 0.5*(A+A.T)
 
 G = nx.Graph(A)
 
 plt.figure()
-pos = nx.spring_layout(G,weight=None,scale=1)
-
-nx.draw(G, pos=pos, node_size=50, width = np.array([G[i][j]['weight'] for i,j in G.edges]))
+#pos = nx.spring_layout(G,weight=None,scale=1)
+plt.imshow(A)
+#nx.draw(G, pos=pos, node_size=50, width = np.array([G[i][j]['weight'] for i,j in G.edges]))
 plt.title('original graph')
 plt.savefig('original_graph.png')
 
@@ -25,7 +25,8 @@ plt.savefig('original_graph.png')
 G_RMST = RMST(G, gamma = 0.5, weighted = True)
 
 plt.figure()
-nx.draw(G_RMST, pos=pos, node_size=50, width = np.array([G_RMST[i][j]['weight'] for i,j in G_RMST.edges]))
+plt.imshow(nx.to_numpy_matrix(G_RMST))
+#nx.draw(G_RMST, pos=pos, node_size=50, width = np.array([G_RMST[i][j]['weight'] for i,j in G_RMST.edges]))
 plt.title('original graph')
 plt.title('RMST')
 plt.savefig('RMST_graph.png')

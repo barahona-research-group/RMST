@@ -38,7 +38,17 @@ def RMST(G, gamma = 0.5, weighted = True):
     """
 
     #get adjacency matrix 
-    A = nx.to_numpy_matrix(G)
+    A_sim = nx.to_numpy_matrix(G)
+
+    #do a few checks
+    if np.max(A_sim) > 1:
+        raise Exception('Please provide a similarity graph, with max(weights) = 1 ')
+
+    if np.linalg.norm(A_sim - A_sim.T) > 1e-10:
+        raise Exception('Please provide an symmetric similarity matrix')
+
+    #convert to a dissimilarity matrix
+    A = 1. - A_sim
 
     #adjacency matrix with large values instead of 0
     A_no_zero = A.copy()
@@ -52,15 +62,15 @@ def RMST(G, gamma = 0.5, weighted = True):
     local_distribution = gamma*(D + D.T)
     
     #compute the mlink matrix 
-    mlink = compute_mlink(G)
+    mlink = compute_mlink(nx.Graph(A))
 
     #construct the adjacency matrix of RMST graph
     A_RMST = mlink + local_distribution - A
-    A_RMST[A_RMST > 0] = 1. #set positive values to 1
+    A_RMST[A_RMST >= 0] = 1. #set positive values to 1
     A_RMST[A_RMST < 0] = 0. #and remove negative values
 
     if weighted:
-        A_RMST = np.multiply(A, A_RMST)    
+        A_RMST = np.multiply(A_sim, A_RMST)    
 
     #return a networkx Graph
     return nx.Graph(A_RMST)

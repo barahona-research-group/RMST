@@ -23,8 +23,9 @@ import networkx as nx
 from multiprocessing import Pool
 import scipy.sparse as sparse
 from functools import partial
+from tqdm import tqdm
 
-def RMST(G, gamma=0.5, weighted = True, n_cpu = 1):
+def RMST(G, gamma = 0.5, weighted = True):
     """
     Networkx wrapper for the RMST code
     Input:
@@ -32,7 +33,6 @@ def RMST(G, gamma=0.5, weighted = True, n_cpu = 1):
     G : networkx graph of similarity
     gamma: RMST parameter
     weighted : return a graph with the original weights
-    n_cpu : number of cpu to use in the construction of mlink matrix 
     
     Return: networkX RMST graph
     """
@@ -52,7 +52,7 @@ def RMST(G, gamma=0.5, weighted = True, n_cpu = 1):
     local_distribution = gamma*(D + D.T)
     
     #compute the mlink matrix 
-    mlink = compute_mlink(G, n_cpu)
+    mlink = compute_mlink(G)
 
     #construct the adjacency matrix of RMST graph
     A_RMST = mlink + local_distribution - A
@@ -65,7 +65,7 @@ def RMST(G, gamma=0.5, weighted = True, n_cpu = 1):
     #return a networkx Graph
     return nx.Graph(A_RMST)
 
-def compute_mlink(G, n_cpu):
+def compute_mlink(G):
     """construct the mlink matrix"""
 
     #minimum spannin tree from G
@@ -74,19 +74,21 @@ def compute_mlink(G, n_cpu):
     #all shortest paths
     all_shortest_paths = dict(nx.all_pairs_shortest_path(G_MST))
 
-    G_mlink = nx.complete_graph(len(G))
+    #G_mlink = nx.complete_graph(len(G))
     mlink = np.zeros([len(G), len(G)])
+    all_edges = []
+    for i in range(len(G)):
+        for j in range(i):
+            all_edges.append( (i,j))
 
-
-    mlink_f = partial(mlink_func, all_shortest_paths, G)
-
-    with Pool(processes = n_cpu) as p_rmst:  #initialise the parallel computation
-        mlink_edges = p_rmst.map(mlink_f, G_mlink.edges()) 
+    mlink_edges = []
+    for e in tqdm(all_edges):
+        mlink_edges.append(mlink_func(all_shortest_paths, G, e))
 
     #convert the output to a matrix
-    mlink_edges_dict = dict(zip(G_mlink.edges(), mlink_edges)) 
-    nx.set_edge_attributes(G_mlink, mlink_edges_dict, 'weight')
-    mlink = nx.to_numpy_matrix(G_mlink)
+    mlink = np.zeros([len(G), len(G)])
+    for i, e in enumerate(all_edges):
+        mlink[e[0]][e[1]] = mlink_edges[i]
 
     return mlink 
 
@@ -96,7 +98,7 @@ def mlink_func(all_shortest_paths, G, e):
     mlink = 0 
     path = all_shortest_paths[e[0]][e[1]]
     for k in range(len(path)-1):
-        mlink = np.max([mlink, G[path[k]][path[k+1]]['weight']])
+        mlink = max(mlink, G[path[k]][path[k+1]]['weight'])
     return mlink
 
 

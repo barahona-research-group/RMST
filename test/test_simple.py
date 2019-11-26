@@ -5,8 +5,11 @@ import scipy as sc
 
 from RMST import RMST
 
+np.random.seed(0)
+
 #create a graph from a random matrix
-A = np.random.uniform(.1,5,[20,20])
+N = 100
+A = np.random.uniform(.1,5,[N, N])
 A += A.T
 
 G = nx.Graph(A)
@@ -18,7 +21,7 @@ nx.draw(G, pos=pos, node_size=50, width = 0.5*np.array([G[i][j]['weight'] for i,
 plt.title('original graph')
 plt.savefig('original_graph.png')
 
-# comput MST graph 
+#compute MST graph 
 G_MST = nx.minimum_spanning_tree(G)
 
 plt.figure()
